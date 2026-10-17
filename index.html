@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b6e99">
+<meta name="description" content="Head-to-toe assessment trainer with medical terminology for LVN students.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" sizes="any" href="icons/icon-any.svg">
+<link rel="apple-touch-icon" href="icons/icon-any.svg">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LVN Trainer">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>LVN Head-to-Toe Assessment Trainer</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#14213d;--mut:#5a6577;--pri:#0b6e99;--pri2:#e3f2f9;--ok:#1b8a4b;--warn:#b7791f;--bad:#c0392b;--line:#d5dde8}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:18px;line-height:1.45}
+header{background:var(--pri);color:#fff;padding:14px 16px}
+header h1{margin:0;font-size:1.25rem}
+header p{margin:2px 0 0;font-size:.85rem;opacity:.9}
+main{max-width:980px;margin:0 auto;padding:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+button{font:inherit;min-height:48px;padding:8px 14px;border-radius:12px;border:2px solid var(--pri);background:#fff;color:var(--pri);cursor:pointer}
+button.on,button.primary{background:var(--pri);color:#fff}
+.grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:760px){.grid{grid-template-columns:380px 1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+svg{width:100%;max-width:420px;height:auto;display:block;margin:0 auto;touch-action:manipulation}
+.reg{fill:#cfe8f3;stroke:#0b6e99;stroke-width:1.5;cursor:pointer}
+.reg.pulse{fill:#f6c1c1;stroke:#c0392b}
+.reg.skin{fill:#eef5f9;stroke:#9db6c4;stroke-dasharray:4 3}
+.reg.sel,.reg.hl{fill:#ffd87a;stroke:#b7791f;stroke-width:3}
+.reg.hl{animation:pl 1s infinite alternate}
+@keyframes pl{from{opacity:.6}to{opacity:1}}
+.lbl{font-size:10px;fill:#4a5a6a;pointer-events:none;text-anchor:middle}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{min-height:44px;font-size:.85rem;padding:6px 10px}
+.chips button.on{background:var(--pri);color:#fff}
+h2{margin:.2em 0;font-size:1.4rem}
+h3{margin:.9em 0 .3em;font-size:1.05rem;color:var(--pri)}
+.term{border:2px solid var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;cursor:pointer;background:#fff}
+.term.sel{border-color:var(--pri);background:var(--pri2)}
+.term b{font-size:1.05rem}
+.term span{display:block;color:var(--mut);font-size:.9rem}
+.norm{background:#e8f6ee;border-left:5px solid var(--ok);padding:8px 10px;border-radius:8px}
+.abn{background:#fdf0ee;border-left:5px solid var(--bad);padding:8px 10px;border-radius:8px}
+.abn ul{margin:.2em 0;padding-left:1.2em}
+.flag{background:#fff6e0;border-left:5px solid var(--warn);padding:8px 10px;border-radius:8px;font-size:.92rem;margin-top:8px}
+.say{margin-top:10px;padding:10px;border:2px dashed var(--pri);border-radius:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=text]{font:inherit;padding:10px;border:2px solid var(--line);border-radius:10px;min-height:48px;flex:1;min-width:150px}
+.res{margin-top:8px;font-weight:600;min-height:1.4em}
+.res.correct{color:var(--ok)}.res.close{color:var(--warn)}.res.wrong{color:var(--bad)}
+.note{font-size:.85rem;color:var(--mut)}
+.score{display:flex;gap:14px;flex-wrap:wrap;font-weight:600;align-items:center}
+.big{font-size:1.3rem;font-weight:700}
+footer{padding:14px;text-align:center;color:var(--mut);font-size:.85rem}
+</style>
+</head>
+<body>
+<header>
+<h1>LVN Head-to-Toe Assessment Trainer</h1>
+<p>Made for Margaret, future LVN. Built by Erica.</p>
+</header>
+<main>
+<div class="bar" id="modebar"></div>
+<div class="grid">
+<div class="card">
+<div class="bar" id="viewbar"></div>
+<div id="mapwrap"></div>
+<div id="listwrap"></div>
+</div>
+<div class="card" id="panel" aria-live="polite"></div>
+</div>
+<p class="note">Speech practice works best in Chrome or Safari with microphone permission allowed. Content is a study aid at standard nursing-textbook level. Always follow your program textbook, instructor, and facility policy.</p>
+</main>
+<footer>LVN Head-to-Toe Assessment Trainer - works offline once loaded</footer>
+<script>
+(function () {
+'use strict';
+
+var Store = {
+  mem: {},
+  get: function (k) { try { var v = window.localStorage.getItem(k); return v === null ? (this.mem[k] || null) : v; } catch (e) { return this.mem[k] || null; } },
+  set: function (k, v) { this.mem[k] = v; try { window.localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+};
+
+function E(cx, cy, rx, ry) { return ['e', cx, cy, rx, ry]; }
+function C(cx, cy, r) { return ['c', cx, cy, r]; }
+function RR(x, y, w, h, r) { return ['r', x, y, w, h, r || 6]; }
+function T(t, d, o) { var x = { t: t, d: d }; if (o) { if (o.a) { x.a = o.a; } if (o.p) { x.p = o.p; } } return x; }
+
+var ABD_GENERAL = [
+  T('Inspect, auscultate, percuss, then palpate', 'Abdomen order differs from other systems: auscultate BEFORE percussion and palpation so bowel sounds are not altered.', { a: ['inspect auscultate percuss palpate'] }),
+  T('Bowel sounds x4 quadrants', 'Listen with the diaphragm in all four quadrants. Normal is roughly 5 to 30 clicks/gurgles per minute.', { a: ['bowel sounds times four quadrants', 'bowel sounds four quadrants'] }),
+  T('Tympany', 'Hollow drum-like percussion note over gas-filled bowel (normal over most of the abdomen). Dullness is expected over liver, spleen, stool, or fluid.')
+];
+var ABD_ABN = ['Hyperactive, hypoactive, or absent bowel sounds', 'Distention, visible peristalsis, or ascites (fluid wave, shifting dullness)', 'Guarding, rigidity, or rebound tenderness (peritoneal irritation)', 'Bruit over aorta/renal arteries; pulsatile mass (do NOT palpate deeply)', 'Cullen sign (periumbilical bruising) or Grey Turner sign (flank bruising)'];
+var ABD_NORM = 'Abdomen flat to rounded, symmetric, skin intact; bowel sounds present in all 4 quadrants; tympany with scattered dullness; soft, non-tender, non-distended, no masses or organomegaly.';
+var ABD_FLAG = 'Absent bowel sounds: many texts say listen a full 5 minutes before calling them absent; others vary. Check your program.';
+
+var REGIONS = [
+{ id: 'scalp', name: 'Cranium / Scalp (Integumentary)', al: ['scalp', 'hair', 'head', 'Scalp / Hair', 'cranium', 'cranial', 'scalp and hair', 'scalp hair'], views: ['front', 'back'], sh: { front: [E(150, 22, 28, 15)], back: [E(150, 42, 30, 38)] },
+  terms: [T('Inspection and palpation', 'Look at hair distribution, texture, and scalp; palpate for lumps, tenderness, or lesions with gloved finger pads.'), T('Alopecia', 'Hair loss (patchy or diffuse).'), T('Pediculosis capitis', 'Head lice; look for nits (eggs) attached firmly to the hair shaft near the scalp, behind the ears and at the nape.', { p: 'peh dick you low sis cap ih tiss' })],
+  normal: 'Hair evenly distributed, clean, with normal texture; scalp is intact, smooth, without lesions, lumps, tenderness, or infestation.',
+  abn: ['Alopecia (patchy or diffuse)', 'Lice or nits, scaling or dandruff, seborrhea', 'Lacerations, hematoma, boggy swelling, tenderness after trauma', 'Open lesions or suspicious pigmented lesions'],
+  flag: '' },
+{ id: 'face', name: 'Facial Region (Craniofacial)', al: ['face', 'facial', 'craniofacial'], views: ['front'], sh: { front: [E(150, 55, 27, 28)] },
+  terms: [T('Symmetry', 'Both sides of the face match at rest and with movement (smile, frown, raise brows, puff cheeks).'), T('Facial droop', 'One-sided drooping; sudden onset is a stroke warning sign. Think FAST (Face, Arm, Speech, Time).'), T('Cranial nerve VII', 'Facial nerve: facial movement, expression, anterior two thirds of taste.', { a: ['cranial nerve seven', 'facial nerve'] }), T('Temporomandibular joint', 'TMJ; palpate in front of the ears while the patient opens and closes the mouth. Note clicking, crepitus, or pain.', { a: ['TMJ', 'T M J'], p: 'tem puh row man dib you lur joint' })],
+  normal: 'Face symmetric with movement, expression appropriate, no edema, lesions, or tenderness; TMJ moves smoothly.',
+  abn: ['Facial droop or asymmetry (stroke, Bell palsy)', 'Facial or periorbital edema', 'Rash (such as malar rash), lesions', 'TMJ clicking, crepitus, or limited opening'],
+  flag: 'Bell palsy affects the whole side of the face including the forehead; stroke typically spares the forehead. Standard teaching, confirm with your text.' },
+{ id: 'eyes', name: 'Ocular / Periorbital Structures', al: ['eyes', 'eye', 'eyelids', 'ocular', 'periorbital', 'eyes and eyelids'], views: ['front'], sh: { front: [C(137, 47, 12), C(163, 47, 12)] },
+  terms: [T('PERRLA', 'Pupils Equal, Round, Reactive to Light and Accommodation.', { a: ['pupils equal round reactive to light and accommodation', 'pearla', 'perla', 'per la'], p: 'per la' }),
+    T('EOMs', 'Extraocular movements: follow a target through the six cardinal fields of gaze (CN III, IV, VI). Should be smooth and symmetric.', { a: ['extraocular movements', 'extraocular muscles', 'E O Ms', 'eeoms'], p: 'extra ocular movements' }),
+    T('Conjunctiva', 'Thin membrane lining the palpebral surface of the eyelid and covering the bulbar surface of the sclera. Normally pink and moist; pale suggests anemia.', { p: 'con junk tie vah' }),
+    T('Sclera', 'Outer fibrous layer of the globe; normally white. Yellow (icterus) suggests jaundice.', { p: 'sklair ah' }),
+    T('Visual acuity', 'Snellen chart (distance) and near card. Record with and without corrective lenses.'),
+    T('Accommodation', 'Pupils constrict and eyes converge when focusing on a near object.')],
+  normal: 'Eyebrows and lashes evenly distributed; lids close fully without ptosis; conjunctiva pink and moist; sclera white; cornea clear; pupils equal, round, reactive to light and accommodation (PERRLA); EOMs intact without nystagmus.',
+  abn: ['Ptosis (drooping lid), lid lag', 'Pale conjunctiva (anemia), injected/red (conjunctivitis), subconjunctival hemorrhage', 'Icteric (yellow) sclera - jaundice', 'Unequal, fixed, pinpoint, or dilated pupils; sluggish reaction (neurologic emergency concerns)', 'Nystagmus, restricted EOMs, exophthalmos, periorbital edema, discharge'],
+  flag: 'Normal pupil size is about 2 to 6 mm depending on light; sources give slightly different ranges.' },
+{ id: 'ears', name: 'Auricular / Otic Structures', al: ['ears', 'ear', 'auricular', 'otic', 'pinna'], views: ['front', 'back'], sh: { front: [C(114, 55, 12), C(186, 55, 12)], back: [C(114, 58, 12), C(186, 58, 12)] },
+  terms: [T('Otoscopic exam', 'Pull the pinna up and back in adults (down and back in young children, about under 3 years) to straighten the canal, then insert the speculum gently.', { a: ['otoscopic examination', 'otoscope exam'], p: 'oh toe scop ick exam' }),
+    T('Cerumen', 'Ceruminous secretion of the external auditory canal; yellow to brown, dry or wet. Impaction can cause conductive hearing loss.', { a: ['earwax', 'ear wax'], p: 'sir oo men' }),
+    T('Tympanic membrane', 'TM; normally pearly gray, translucent, intact, with a cone of light and visible landmarks.', { a: ['TM', 'eardrum', 'T M'], p: 'tim pan ick membrane' }),
+    T('Whispered voice test', 'Auditory acuity screen: occlude one ear, whisper numbers or words from about 1 to 2 feet.', { a: ['whisper test'] }),
+    T('Weber and Rinne', 'Tuning fork tests: Weber (midline, lateralization) and Rinne (air versus bone conduction). Usually a provider or advanced exam.', { a: ['weber', 'rinne', 'weber rinne'], p: 'way ber and rin nay' })],
+  normal: 'Auricles symmetric, same color as face, no lesions or tenderness; canal clear with small amount of cerumen; tympanic membrane pearly gray and intact; hears whispered voice bilaterally.',
+  abn: ['Impacted cerumen, foreign body', 'Otorrhea (drainage), blood or CSF concerns after head trauma', 'Red, bulging TM (otitis media) or retracted dull TM', 'Pain with tragus or pinna movement (otitis externa)', 'Hearing loss, tinnitus, vertigo'],
+  flag: '' },
+{ id: 'nose', name: 'Nasal / Paranasal Sinuses', al: ['nose', 'sinuses', 'nares', 'Nose / Sinuses', 'nasal', 'paranasal sinuses', 'nose and sinuses'], views: ['front'], sh: { front: [E(150, 66, 11, 12)] },
+  terms: [T('Patent nares', 'Both nostrils open and air moves freely; check each by occluding the other.', { p: 'pay tent nay reez' }),
+    T('Septum midline', 'Nasal septum straight and intact, without perforation.'),
+    T('Nasal mucosa', 'Pink and moist; pale and boggy (allergy) or red (infection). Turbinates normally pink.', { a: ['mucosa', 'turbinates'] }),
+    T('Sinus tenderness', 'Palpate frontal and maxillary sinuses; tenderness suggests sinusitis.', { a: ['sinuses'] }),
+    T('Epistaxis', 'Hemorrhage from the nasal mucosa.', { a: ['nosebleed'], p: 'epp ih stax is' })],
+  normal: 'Nose midline, symmetric; nares patent bilaterally; septum midline and intact; mucosa pink and moist without drainage, polyps, or bleeding; sinuses non-tender.',
+  abn: ['Deviated septum, perforation', 'Rhinorrhea (clear, purulent), congestion', 'Epistaxis, crusting, nasal polyps', 'Frontal or maxillary sinus tenderness', 'Flaring of nares with breathing (respiratory distress sign)'],
+  flag: '' },
+{ id: 'mouth', name: 'Oral Cavity / Oropharynx', al: ['mouth', 'throat', 'oropharynx', 'pharynx', 'Mouth / Throat', 'oral cavity', 'oral', 'mouth and throat'], views: ['front'], sh: { front: [RR(134, 82, 32, 15, 7)] },
+  terms: [T('Mucous membranes', 'Pink, moist, intact. Dry membranes can suggest dehydration.', { a: ['mucus membranes'] }),
+    T('Uvula midline', 'Uvula hangs in the center and rises midline when the patient says "ahh" (CN IX and X).', { p: 'you view la mid line' }),
+    T('Tonsillar grading', 'Grade 0 (surgically absent) to 4+ (tonsils touch at midline). Note erythema or exudate.', { a: ['tonsil grading', 'tonsillar grade'], p: 'tonsil lar grading' }),
+    T('Gag reflex', 'Elicited by touching the posterior pharynx (CN IX and X); assess when swallowing safety is a concern.'),
+    T('Dentition', 'Teeth: number, condition, caries, dentures, and oral hygiene.'),
+    T('Oral candidiasis', 'Thrush: creamy white patches that can be scraped off, leaving red tissue.', { a: ['thrush', 'candidiasis', 'oral thrush'], p: 'oral can dih die uh sis' }),
+    T('Dysphagia', 'Impaired deglutition; an aspiration risk.', { a: ['difficulty swallowing'], p: 'dis fay jah' })],
+  normal: 'Lips pink, moist, symmetric; mucous membranes pink and moist; teeth and gums healthy; tongue midline, moves freely; uvula midline; tonsils not enlarged (0 to 1+); posterior pharynx pink without exudate; speech clear.',
+  abn: ['Pallor, cyanosis (central), cracked lips (cheilitis)', 'Dry, coated, or ulcerated mucosa; white patches (thrush, leukoplakia)', 'Gum bleeding, caries, poor hygiene', 'Tonsillar enlargement or exudate (pharyngitis, tonsillitis)', 'Deviated uvula or tongue, dysphagia, halitosis'],
+  flag: 'Tonsil grading scales vary slightly by source (0 to 4 is the common one).' },
+{ id: 'neck', name: 'Cervical Region (Lymph nodes, Thyroid, JVD)', al: ['neck', 'lymph nodes', 'thyroid', 'jvd', 'jugular', 'Neck (Lymph nodes, Thyroid, JVD)', 'cervical', 'cervical region', 'neck lymph nodes thyroid jvd'], views: ['front', 'back'], sh: { front: [RR(132, 99, 36, 28, 8)], back: [RR(132, 99, 36, 28, 8)] },
+  terms: [T('Tracheal midline', 'Trachea sits midline above the sternal notch. Deviation can indicate tension pneumothorax, mass, or large effusion.', { a: ['trachea midline', 'trachea is midline'], p: 'tray key al mid line' }),
+    T('Lymph nodes', 'Preauricular, postauricular, occipital, tonsillar, submandibular, submental, anterior and posterior cervical, supraclavicular. Normally non-palpable, or small, soft, mobile, non-tender.', { a: ['lymphadenopathy'] }),
+    T('Thyroid', 'Butterfly-shaped gland below the cricoid cartilage; palpate while the patient swallows water. Normally smooth, not visibly enlarged.'),
+    T('JVD', 'Jugular venous distention: with head of bed at 30 to 45 degrees, distention more than about 3 cm above the sternal angle suggests elevated right-sided pressure (heart failure).', { a: ['jugular venous distention', 'jugular vein distention', 'jay vee dee'], p: 'jugular venous distention' }),
+    T('Range of motion', 'Flexion, extension, lateral bending, rotation; should be smooth and painless.', { a: ['ROM'] }),
+    T('Nuchal rigidity', 'Pain and resistance on cervical flexion; can suggest meningeal irritation.', { p: 'new kal ri jid ih tee' })],
+  normal: 'Neck symmetric, supple, full ROM without pain; trachea midline; no palpable lymph nodes; thyroid not visible, not enlarged, moves with swallowing; no JVD at 30 to 45 degrees; carotids equal without bruit.',
+  abn: ['Tracheal deviation', 'Enlarged, hard, fixed, or tender lymph nodes', 'Goiter, thyroid nodule', 'JVD (right heart failure, fluid overload)', 'Neck stiffness / nuchal rigidity, limited ROM'],
+  flag: 'Exact JVD cutoff and landmark (sternal angle plus about 3 cm) is textbook standard; some sources use 4 cm.' },
+{ id: 'carotid', name: 'Carotid Pulse', al: ['carotid', 'carotid pulse'], views: ['front'], pulse: true, sh: { front: [C(138, 108, 11), C(162, 108, 11)] },
+  terms: [T('Carotid pulse', 'Palpate medially to the sternocleidomastoid, one side at a time, never both at once (risk of reduced cerebral blood flow or vagal slowing).', { p: 'cuh rot id pulse' }),
+    T('Bruit', 'Whooshing sound heard with the stethoscope over a narrowed artery; carotid bruit suggests stenosis.', { p: 'broo ee' })],
+  normal: 'Pulses equal bilaterally, strong (2+), regular, smooth upstroke; no bruit.',
+  abn: ['Weak, absent, or unequal pulse', 'Bruit (carotid stenosis)', 'Bounding pulse'],
+  flag: 'Avoid pressing hard or massaging; palpate gently.' },
+{ id: 'shoulders', name: 'Shoulder Girdle (Glenohumeral / Clavicular)', al: ['shoulders', 'shoulder', 'clavicle', 'shoulder girdle', 'glenohumeral', 'acromioclavicular'], views: ['front', 'back'], sh: { front: [C(100, 140, 20), C(200, 140, 20)], back: [C(100, 140, 20), C(200, 140, 20)] },
+  terms: [T('Range of motion', 'Flexion, extension, abduction, adduction, internal and external rotation.', { a: ['ROM'] }),
+    T('Muscle strength 0 to 5', '0 none; 1 flicker; 2 moves with gravity eliminated; 3 against gravity; 4 against some resistance; 5 full resistance (normal).', { a: ['muscle strength zero to five', 'muscle strength'] }),
+    T('Symmetry', 'Shoulder heights and contours equal; note swelling, deformity, or atrophy.')],
+  normal: 'Shoulders symmetric and level; full painless ROM; strength 5/5 bilaterally; no swelling, deformity, or crepitus.',
+  abn: ['Limited or painful ROM', 'Asymmetry, dislocation, clavicle step-off', 'Muscle weakness or atrophy', 'Swelling, warmth, tenderness'],
+  flag: '' },
+{ id: 'chest', name: 'Anterior Thorax (Thoracic Cage)', al: ['chest', 'thorax', 'thoracic', 'Chest / Thorax', 'anterior thorax', 'thoracic cage', 'chest thorax'], views: ['front'], sh: { front: [RR(112, 128, 76, 62, 10)] },
+  terms: [T('Anteroposterior diameter', 'Normal AP diameter is less than lateral (ratio about 1:2). Barrel chest (AP equals lateral) is seen in COPD.', { a: ['AP diameter', 'barrel chest'] }),
+    T('Respiratory rate and effort', 'Adults 12 to 20 per minute, even, unlabored; note accessory muscle use, retractions, or nasal flaring.', { a: ['respirations', 'respiratory effort', 'work of breathing'] }),
+    T('Thoracic excursion', 'Symmetric rise and fall with breathing; place hands on posterior chest and watch thumbs move apart.', { a: ['chest expansion', 'symmetrical chest expansion', 'thoracic expansion'] }),
+    T('Pectus', 'Pectus excavatum (sunken sternum) or pectus carinatum (protruding sternum).', { a: ['pectus excavatum', 'pectus carinatum'] })],
+  normal: 'Chest symmetric, elliptical shape, AP smaller than lateral; skin intact; respirations 12 to 20, quiet, regular, unlabored; symmetric expansion; no retractions.',
+  abn: ['Barrel chest, pectus deformities, kyphoscoliosis', 'Asymmetric or paradoxical movement (flail chest)', 'Retractions, accessory muscle use, tripod positioning', 'Subcutaneous emphysema (crepitus under skin)'],
+  flag: '' },
+{ id: 'lungs_ant', name: 'Pulmonary Fields (Anterior Thorax)', al: ['lungs anterior', 'anterior lungs', 'lungs', 'Lungs (Anterior)', 'pulmonary anterior', 'anterior pulmonary fields', 'pulmonary fields anterior'], views: ['front'], sh: { front: [RR(116, 132, 31, 44, 12), RR(153, 132, 31, 44, 12)] },
+  terms: [T('Clear to auscultation bilaterally', 'Often charted CTAB. Listen with the diaphragm to the same level on both sides, comparing side to side, one full breath per site.', { a: ['CTAB', 'clear to auscultation', 'lungs clear bilaterally'], p: 'clear to auss cull tay shun by lateral lee' }),
+    T('Vesicular breath sounds', 'Normal soft, low-pitched sounds over most of the lung fields; inspiration longer than expiration.', { p: 'veh sick you lar' }),
+    T('Adventitious sounds', 'Abnormal added sounds: crackles, rhonchi, wheezes, stridor, pleural friction rub.', { a: ['adventitious breath sounds'], p: 'add ven tish us sounds' }),
+    T('Crackles (rales)', 'Discontinuous popping or bubbling sounds, often on inspiration; heart failure, pneumonia, fibrosis.', { a: ['crackles', 'rales'] }),
+    T('Rhonchi', 'Low-pitched, continuous, snoring or gurgling sounds from secretions in large airways; may clear with coughing.', { p: 'ron kye' }),
+    T('Wheezes', 'High-pitched continuous whistling from narrowed airways; asthma, COPD; usually expiratory.', { a: ['wheeze', 'wheezing'] }),
+    T('Stridor', 'High-pitched harsh sound on inspiration from upper airway obstruction; an emergency.', { p: 'stry dor' }),
+    T('Pleural friction rub', 'Grating, creaking sound from inflamed pleural surfaces, heard on both inspiration and expiration.', { a: ['friction rub', 'pleural rub'] }),
+    T('Diminished breath sounds', 'Reduced airflow (atelectasis, effusion, pneumothorax, COPD) or absent over affected area.', { a: ['diminished', 'decreased breath sounds'] })],
+  normal: 'Respirations quiet and unlabored; vesicular sounds over the lung fields, bronchovesicular near the sternum and between scapulae; clear to auscultation bilaterally with no adventitious sounds; percussion resonant.',
+  abn: ['Crackles (rales), rhonchi, wheezes, stridor, pleural friction rub', 'Diminished or absent breath sounds', 'Dullness to percussion (consolidation, effusion) or hyperresonance (pneumothorax, COPD)', 'Cough, sputum changes, dyspnea, cyanosis', 'Decreased SpO2'],
+  flag: 'Some texts name rales/rhonchi differently (fine versus coarse crackles). Use your program terms.' },
+{ id: 'lungs_post', name: 'Pulmonary Fields (Posterior Thorax)', al: ['lungs posterior', 'posterior lungs', 'back lungs', 'lungs', 'Lungs (Posterior)', 'pulmonary posterior', 'posterior pulmonary fields', 'pulmonary fields posterior'], views: ['back'], sh: { back: [RR(112, 128, 34, 76, 12), RR(154, 128, 34, 76, 12)] },
+  terms: [T('Posterior auscultation', 'Listen between ribs in a ladder pattern from apices to bases (about C7 to T10), side to side. Have patient breathe deeply through the mouth, sitting forward with arms folded.', { a: ['posterior lung auscultation'] }),
+    T('Clear to auscultation bilaterally', 'CTAB, no adventitious sounds.', { a: ['CTAB', 'clear to auscultation'], p: 'clear to auss cull tay shun by lateral lee' }),
+    T('Tactile fremitus', 'Vibration felt on the chest wall when the patient says "ninety-nine"; increased in consolidation, decreased with air or fluid.', { p: 'tack tile fremitus' }),
+    T('Percussion', 'Resonance over normal lung; dull over fluid or consolidation; hyperresonant with trapped air.', { a: ['resonance', 'resonant'] }),
+    T('Crackles at the bases', 'Bibasilar crackles are classic with fluid overload and heart failure.', { a: ['bibasilar crackles', 'crackles'] })],
+  normal: 'Symmetric expansion; vesicular breath sounds throughout posterior fields; resonant to percussion; no adventitious sounds; diaphragmatic excursion about 3 to 5 cm.',
+  abn: ['Crackles at the bases (fluid, atelectasis)', 'Wheezes, rhonchi, friction rub', 'Dullness at bases (pleural effusion, consolidation)', 'Asymmetric expansion', 'Absent sounds over a lobe or lung'],
+  flag: 'Auscultation sites and lobe locations (right upper, middle, lower; left upper, lower with lingula) are standard teaching.' },
+{ id: 'heart', name: 'Precordium (Cardiac)', al: ['heart', 'cardiac', 'precordium', 'cardiac region'], views: ['front'], sh: { front: [C(160, 156, 16)] },
+  terms: [T('S1 and S2', 'S1 (lub) is closure of mitral and tricuspid valves, loudest at the apex; S2 (dub) is closure of aortic and pulmonic valves, loudest at the base.', { a: ['S1 S2', 'S one S two', 'heart sounds'], p: 'S one and S two' }),
+    T('PMI', 'Point of maximal impulse; normally at the 5th intercostal space, left midclavicular line, about 1 to 2 cm wide.', { a: ['point of maximal impulse', 'point of maximum impulse', 'P M I'], p: 'point of maximal impulse' }),
+    T('Apical pulse', 'Count for a full 60 seconds at the PMI with the stethoscope; obtain before giving digoxin and other cardiac drugs per order.', { a: ['apical heart rate', 'apical'], p: 'ape ick al pulse' }),
+    T('Murmur', 'Extra swishing sound from turbulent blood flow; graded I to VI by loudness; describe timing, location, and radiation.', { a: ['heart murmur'] }),
+    T('S3 and S4', 'S3 (ventricular gallop) can be normal in children but suggests heart failure in adults; S4 (atrial gallop) suggests a stiff ventricle.', { a: ['S3', 'S4', 'gallop'], p: 'S three and S four' }),
+    T('Regular rate and rhythm', 'RRR: pulse 60 to 100, regular. Irregular rhythms include atrial fibrillation.', { a: ['RRR'] }),
+    T('Capillary refill', 'Press nail bed until it blanches; color should return within about 2 to 3 seconds.', { a: ['cap refill'] })],
+  normal: 'S1 and S2 audible, regular rate and rhythm, no murmurs, gallops, or rubs; PMI at the 5th intercostal space, left midclavicular line; no heaves or thrills; capillary refill under 2 to 3 seconds.',
+  abn: ['Murmur, S3, S4, pericardial friction rub', 'Irregular rhythm, tachycardia, bradycardia', 'Displaced or enlarged PMI (cardiomegaly)', 'Heaves, thrills', 'Delayed capillary refill, edema, JVD'],
+  flag: 'Auscultation areas: aortic (right 2nd ICS), pulmonic (left 2nd ICS), Erb point (left 3rd ICS), tricuspid (left lower sternal border, 4th ICS), mitral/apical (5th ICS MCL). Standard teaching; the map shows approximate heart position only. Pulse deficit = apical minus radial.' },
+{ id: 'breasts', name: 'Mammary Region / Axillae', al: ['breasts', 'breast', 'axillae', 'mammary', 'mammary region'], views: ['front'], sh: { front: [C(131, 204, 14), C(169, 204, 14)] },
+  terms: [T('Inspection', 'Observe symmetry, contour, skin color, dimpling, and nipple position with arms at sides, raised, and hands on hips.', { a: ['breast inspection'] }),
+    T('Palpation', 'Use finger pads in a systematic pattern (circular, vertical strip, or wedge) covering breast tissue, tail of Spence, and axilla.', { a: ['breast palpation'] }),
+    T('Peau d orange', 'Orange-peel skin texture; a concerning sign of possible malignancy.', { a: ['peau d\u2019orange', 'peau dorange', 'orange peel'], p: 'poh doe ranj' }),
+    T('Nipple discharge', 'Note color, consistency, and whether unilateral or bilateral.')],
+  normal: 'Breasts symmetric (mild size difference common); skin smooth; nipples everted or inverted since birth; no masses, dimpling, retraction, or discharge; axillary nodes non-palpable. Applies to all genders with breast tissue.',
+  abn: ['Dimpling, peau d orange, retraction, new nipple inversion', 'Discrete, hard, fixed, irregular mass', 'Bloody or spontaneous nipple discharge', 'Axillary lymphadenopathy', 'Redness, warmth, pain (mastitis)'],
+  flag: 'Screening recommendations (self-exam teaching, clinical breast exam, mammogram timing) vary by organization; follow current program and facility guidance.' },
+{ id: 'arms', name: 'Upper Extremities (Brachial Region)', al: ['arms', 'arm', 'upper extremities', 'forearm', 'brachial region', 'upper extremity'], views: ['front', 'back'], sh: { front: [RR(64, 160, 26, 78, 12), RR(210, 160, 26, 78, 12)], back: [RR(64, 160, 26, 78, 12), RR(210, 160, 26, 78, 12)] },
+  terms: [T('Muscle strength 0 to 5', 'Test grip, elbow flexion and extension against resistance. 5 is full strength.', { a: ['muscle strength', 'muscle strength zero to five'] }),
+    T('Pronator drift', 'Arms outstretched, palms up, eyes closed 20 to 30 seconds; one arm drifting down or pronating suggests a neurologic problem.', { p: 'pro nay tor drift' }),
+    T('Edema', 'Swelling; note bilateral versus unilateral, and check IV sites and the side of any mastectomy or dialysis access.', { a: ['lymphedema'] }),
+    T('Symmetry and ROM', 'Compare size, contour, and motion side to side.', { a: ['range of motion'] })],
+  normal: 'Arms symmetric in size and contour; skin intact and warm; full ROM; strength 5/5 bilaterally; no edema, tenderness, or deformity; pulses present.',
+  abn: ['Weakness, drift, or paralysis', 'Unilateral swelling (infiltration, thrombosis, lymphedema)', 'Redness or streaking at IV site (phlebitis)', 'Deformity or pain after trauma', 'Bruising or track marks'],
+  flag: '' },
+{ id: 'brachial', name: 'Brachial Pulse', al: ['brachial', 'brachial pulse'], views: ['front'], pulse: true, sh: { front: [C(95, 190, 12), C(205, 190, 12)] },
+  terms: [T('Brachial pulse', 'Felt medial to the biceps tendon in the antecubital fossa; used for blood pressure and for infant CPR pulse checks.', { p: 'bray key al pulse' }),
+    T('Pulse amplitude scale', '0 absent; 1+ weak or thready; 2+ normal; 3+ bounding. Some facilities use a 0 to 4 scale.', { a: ['pulse scale', 'pulse amplitude'] })],
+  normal: 'Palpable, equal bilaterally, 2+, regular.',
+  abn: ['Weak or absent', 'Bounding', 'Unequal pulses between arms'],
+  flag: 'Pulse scales differ (0-3 versus 0-4); confirm facility policy.' },
+{ id: 'elbows', name: 'Cubital Region (Olecranon / Antecubital)', al: ['elbows', 'elbow', 'cubital', 'cubital region', 'antecubital', 'olecranon'], views: ['front', 'back'], sh: { front: [C(77, 214, 13), C(223, 214, 13)], back: [C(77, 214, 13), C(223, 214, 13)] },
+  terms: [T('Flexion and extension', 'Bending and straightening the elbow; normal about 0 to 150 degrees.', { a: ['range of motion', 'flexion extension'] }),
+    T('Supination and pronation', 'Forearm rotation palm up (supination) and palm down (pronation).', { p: 'soup in nay shun and pro nay shun' }),
+    T('Olecranon', 'Bony point of the elbow; check for swelling or bursitis, or nodules (rheumatoid).', { p: 'oh leck ra non' })],
+  normal: 'Joint symmetric, no swelling, redness, warmth, or tenderness; full ROM; strength 5/5.',
+  abn: ['Swelling or redness (bursitis, arthritis)', 'Limited ROM or pain', 'Nodules, deformity, crepitus', 'Tenderness at epicondyles'],
+  flag: '' },
+{ id: 'radial', name: 'Radial Pulse', al: ['radial', 'radial pulse', 'wrist pulse'], views: ['front'], pulse: true, sh: { front: [C(77, 252, 12), C(223, 252, 12)] },
+  terms: [T('Radial pulse', 'Radial aspect of the volar wrist; use pads of 2 or 3 fingers, never the thumb. Count 30 seconds x2, or a full 60 seconds if irregular.', { p: 'ray dee al pulse' }),
+    T('Rate, rhythm, and strength', 'Normal adult rate 60 to 100, regular, strength 2+.', { a: ['rate rhythm strength', 'pulse rate rhythm'] }),
+    T('Allen test', 'Checks ulnar collateral circulation before radial artery puncture.', { a: ['modified allen test'] })],
+  normal: 'Pulse 60 to 100 per minute, regular, equal bilaterally, strength 2+.',
+  abn: ['Tachycardia (over 100), bradycardia (under 60)', 'Irregular rhythm', 'Thready/weak or bounding', 'Absent or unequal'],
+  flag: '' },
+{ id: 'hands', name: 'Manus / Digits (Nail Beds)', al: ['hands', 'hand', 'nails', 'fingers', 'fingernails', 'Hands / Nails', 'manus', 'digits', 'nail beds', 'hands and nails'], views: ['front', 'back'], sh: { front: [E(76, 282, 16, 22), E(224, 282, 16, 22)], back: [E(76, 282, 16, 22), E(224, 282, 16, 22)] },
+  terms: [T('Capillary refill', 'Blanch the nail bed; color should return in under 2 to 3 seconds.', { a: ['cap refill'] }),
+    T('Clubbing', 'Nail base angle 180 degrees or more with bulbous fingertips; chronic hypoxia (COPD, lung disease, some cardiac disease).', { a: ['finger clubbing'] }),
+    T('Koilonychia', 'Spoon-shaped nails; associated with iron-deficiency anemia.', { a: ['spooning', 'spoon nails'], p: 'coy low nick ee ah' }),
+    T('Cyanosis', 'Bluish nail beds or fingertips from poor oxygenation or perfusion.', { p: 'sigh uh no sis' }),
+    T('Manual grip strength', 'Patient grasps two of the examiner fingers; palmar grasp should be strong and equal bilaterally.', { a: ['grip strength', 'hand grip'] }),
+    T('Splinter hemorrhages', 'Thin dark lines under the nail; seen with endocarditis or trauma.')],
+  normal: 'Nails smooth, pink beds, firm, with a nail angle of about 160 degrees; capillary refill under 2 to 3 seconds; hands warm; full ROM of fingers; grip strong and equal; sensation intact.',
+  abn: ['Clubbing, spooning, pitting, ridging', 'Cyanotic or pale nail beds, delayed cap refill', 'Joint deformity (Heberden and Bouchard nodes, ulnar deviation)', 'Numbness or tingling (carpal tunnel: Phalen and Tinel tests)', 'Tremor, weakness, cold hands'],
+  flag: '' },
+{ id: 'abd_ruq', name: 'Abdominal Right Upper Quadrant (RUQ)', al: ['right upper quadrant', 'RUQ', 'abdomen right upper', 'Abdomen - RUQ', 'abdominal ruq', 'abdomen ruq'], views: ['front'], sh: { front: [RR(112, 224, 37, 34, 4)] },
+  terms: [T('Right upper quadrant', 'Liver, gallbladder, part of the right kidney, hepatic flexure, part of pancreas and duodenum.', { a: ['RUQ', 'R U Q'], p: 'right upper quadrant' }),
+    T('Murphy sign', 'Pain or sudden stop of inspiration when palpating under the right costal margin; suggests cholecystitis.', { a: ['murphys sign'] })].concat(ABD_GENERAL),
+  normal: ABD_NORM + ' Liver edge may be non-palpable or just at the costal margin.',
+  abn: ['Tenderness, guarding (gallbladder or liver disease)', 'Hepatomegaly, jaundice'].concat(ABD_ABN),
+  flag: ABD_FLAG },
+{ id: 'abd_luq', name: 'Abdominal Left Upper Quadrant (LUQ)', al: ['left upper quadrant', 'LUQ', 'abdomen left upper', 'Abdomen - LUQ', 'abdominal luq', 'abdomen luq'], views: ['front'], sh: { front: [RR(151, 224, 37, 34, 4)] },
+  terms: [T('Left upper quadrant', 'Stomach, spleen, left kidney, splenic flexure, body and tail of pancreas.', { a: ['LUQ', 'L U Q'], p: 'left upper quadrant' })].concat(ABD_GENERAL),
+  normal: ABD_NORM + ' Spleen not palpable.',
+  abn: ['Splenomegaly (palpable spleen; avoid vigorous palpation)', 'Epigastric or LUQ pain (gastritis, ulcer, pancreatitis)'].concat(ABD_ABN),
+  flag: ABD_FLAG },
+{ id: 'abd_rlq', name: 'Abdominal Right Lower Quadrant (RLQ)', al: ['right lower quadrant', 'RLQ', 'abdomen right lower', 'Abdomen - RLQ', 'abdominal rlq', 'abdomen rlq'], views: ['front'], sh: { front: [RR(112, 260, 37, 34, 4)] },
+  terms: [T('Right lower quadrant', 'Cecum, appendix, right ovary and fallopian tube, right ureter.', { a: ['RLQ', 'R L Q'], p: 'right lower quadrant' }),
+    T('McBurney point', 'About one third of the way from the right anterior superior iliac spine to the umbilicus; tenderness suggests appendicitis.', { a: ['mcburneys point', 'mcburney s point'], p: 'mick burn ee point' }),
+    T('Rebound tenderness', 'Pain on quick release after deep palpation; indicates peritoneal irritation. Not routinely done once rigidity is evident.', { a: ['rebound'] })].concat(ABD_GENERAL),
+  normal: ABD_NORM,
+  abn: ['RLQ pain, rebound, guarding (appendicitis)', 'Rovsing sign (LLQ palpation causes RLQ pain)', 'Hernia (inguinal) with cough'].concat(ABD_ABN),
+  flag: ABD_FLAG + ' Rovsing and psoas/obturator signs are advanced tests usually done by a provider.' },
+{ id: 'abd_llq', name: 'Abdominal Left Lower Quadrant (LLQ)', al: ['left lower quadrant', 'LLQ', 'abdomen left lower', 'Abdomen - LLQ', 'abdominal llq', 'abdomen llq'], views: ['front'], sh: { front: [RR(151, 260, 37, 34, 4)] },
+  terms: [T('Left lower quadrant', 'Sigmoid and descending colon, left ovary and fallopian tube, left ureter.', { a: ['LLQ', 'L L Q'], p: 'left lower quadrant' })].concat(ABD_GENERAL),
+  normal: ABD_NORM + ' Stool may be palpable in the sigmoid colon.',
+  abn: ['LLQ pain and tenderness (diverticulitis, constipation)', 'Palpable mass, hernia'].concat(ABD_ABN),
+  flag: ABD_FLAG },
+{ id: 'cva', name: 'Costovertebral Angle (CVA)', al: ['CVA', 'costovertebral angle', 'flank', 'kidneys', 'Flank / CVA', 'costovertebral', 'flank cva', 'renal angle'], views: ['back'], sh: { back: [RR(94, 212, 28, 34, 6), RR(178, 212, 28, 34, 6)] },
+  terms: [T('CVA tenderness', 'Costovertebral angle tenderness: gently fist-percuss over the angle of the 12th rib and spine. Pain suggests kidney inflammation or infection (pyelonephritis).', { a: ['costovertebral angle tenderness', 'C V A tenderness'], p: 'costo vertebral angle tenderness' }),
+    T('Kidneys', 'Retroperitoneal organs behind the flanks; assess urine output, color, and flank pain.', { a: ['kidney', 'flank'] })],
+  normal: 'No CVA tenderness on percussion; no flank swelling or bruising.',
+  abn: ['CVA tenderness (pyelonephritis, kidney stone)', 'Flank ecchymosis (Grey Turner sign)', 'Dysuria, hematuria, fever'],
+  flag: 'Percuss with the ulnar surface of a fist, gently, over the covered angle.' },
+{ id: 'spine', name: 'Posterior Thorax / Vertebral Column', al: ['spine', 'back', 'vertebrae', 'sacrum', 'Back / Spine', 'vertebral column', 'posterior thorax', 'back and spine', 'spinal column'], views: ['back'], sh: { back: [RR(137, 108, 26, 174, 8)] },
+  terms: [T('Spinal alignment', 'Inspect from behind and the side: vertebrae in a straight line; normal cervical and lumbar lordosis and thoracic kyphosis.', { a: ['spine alignment', 'spinal curvature'] }),
+    T('Scoliosis', 'Lateral curvature of the spine; Adams forward-bend test shows rib hump.', { p: 'sko lee oh sis' }),
+    T('Kyphosis', 'Exaggerated thoracic convexity (increased posterior curvature of the thoracic spine).', { p: 'kye foe sis' }),
+    T('Lordosis', 'Exaggerated lumbar concavity (increased anterior curvature of the lumbar spine).', { p: 'lor doe sis' }),
+    T('Vertebral tenderness', 'Palpate or percuss spinous processes for pain.', { a: ['spinal tenderness'] }),
+    T('Sacrum and coccyx', 'Common pressure injury sites; inspect skin on every repositioning.', { a: ['sacrum', 'coccyx', 'sacral skin'] })],
+  normal: 'Spine straight with normal curves; no tenderness, muscle spasm, or deformity; full painless ROM; sacral skin intact.',
+  abn: ['Scoliosis, kyphosis, lordosis', 'Vertebral tenderness, muscle spasm', 'Limited ROM, radicular pain', 'Sacral pressure injury, sacral edema', 'Step-off or deformity after trauma (maintain spinal precautions)'],
+  flag: '' },
+{ id: 'hips', name: 'Gluteal / Pelvic Region', al: ['hips', 'hip', 'buttocks', 'gluteal', 'pelvis', 'Hips / Buttocks', 'pelvic', 'gluteal region', 'gluteal pelvic', 'hips and buttocks'], views: ['front', 'back'], sh: { front: [RR(108, 296, 84, 24, 10)], back: [RR(108, 284, 84, 36, 12)] },
+  terms: [T('Range of motion', 'Flexion, extension, abduction, adduction, internal and external rotation.', { a: ['ROM', 'hip range of motion'] }),
+    T('Gait', 'Observe walking: smooth, rhythmic, arms swinging, balanced. Note limp, shuffling, or ataxia.', { a: ['gait assessment'], p: 'gate' }),
+    T('Trendelenburg sign', 'Pelvis drops on the unaffected side when standing on one leg; indicates weak hip abductors.', { p: 'tren del en berg' }),
+    T('Trochanter pressure points', 'Greater trochanters are common pressure injury sites in side-lying position.', { a: ['trochanter'], p: 'tro kan ter' })],
+  normal: 'Hips level and symmetric; full painless ROM; steady, coordinated gait; skin intact over bony prominences.',
+  abn: ['Shortened, externally rotated leg (hip fracture)', 'Limited or painful ROM', 'Limp, antalgic gait', 'Pressure injury over trochanter or ischium'],
+  flag: '' },
+{ id: 'genital', name: 'Genitalia / Anorectal / Perineal', al: ['genitalia', 'genital', 'rectal', 'perineum', 'groin', 'Genitalia / Rectal', 'anorectal', 'genitourinary', 'genitalia and rectal'], views: ['front'], sh: { front: [C(150, 306, 11)] },
+  terms: [T('External inspection', 'Inspect for lesions, redness, swelling, discharge, odor, or hair distribution. Use gloves, privacy, explanation, and consent; consider a chaperone.', { a: ['inspection', 'external genitalia'] }),
+    T('Discharge', 'Note color, odor, and amount.'),
+    T('Hernia', 'Protrusion through the inguinal canal or into the scrotum, evident with coughing or straining (Valsalva).', { a: ['inguinal hernia'], p: 'her nee uh' }),
+    T('Hemorrhoids', 'Dilated anorectal venous plexuses; note bleeding or pain.', { p: 'hem or oyds' }),
+    T('Occult blood', 'Stool testing for hidden blood (fecal occult blood test).', { a: ['fecal occult blood', 'FOBT'] })],
+  normal: 'External genitalia and perineum clean, intact, no lesions, swelling, or discharge; anus without hemorrhoids or fissures. Internal and digital exams are generally done by a provider; scope of practice varies.',
+  abn: ['Lesions, ulcers, warts, rash', 'Abnormal discharge, odor', 'Testicular swelling or pain (torsion is an emergency)', 'Hernia, hemorrhoids, fissure, rectal bleeding', 'Perineal skin breakdown (incontinence)'],
+  flag: 'Brief on purpose. Keep it clinical, respect dignity, follow facility policy and scope of practice for LVNs.' },
+{ id: 'legs', name: 'Lower Extremities (Femoral / Crural)', al: ['legs', 'leg', 'lower extremities', 'thighs', 'calves', 'crural', 'lower extremity', 'femoral crural'], views: ['front', 'back'], sh: { front: [RR(112, 322, 34, 82, 12), RR(154, 322, 34, 82, 12), RR(112, 450, 34, 100, 12), RR(154, 450, 34, 100, 12)], back: [RR(112, 322, 34, 90, 12), RR(154, 322, 34, 90, 12), RR(112, 452, 34, 98, 12), RR(154, 452, 34, 98, 12)] },
+  terms: [T('Pitting edema', 'Press 5 seconds over bone. 1+ trace (about 2 mm, disappears quickly); 2+ moderate (about 4 mm, under 15 sec); 3+ deep (about 6 mm, over 1 minute); 4+ very deep (about 8 mm, 2 to 5 minutes).', { a: ['edema', 'pitting edema grades', 'pitting edema one plus to four plus'] }),
+    T('Capillary refill', 'Return of color to a pressed toenail under 2 to 3 seconds.', { a: ['cap refill'] }),
+    T('Homans sign', 'Calf pain on passive dorsiflexion. Limited validity: poor sensitivity and specificity, so it should not be relied on to rule DVT in or out.', { a: ['homan sign', 'homans'], p: 'ho mans sign' }),
+    T('Deep vein thrombosis', 'DVT: unilateral swelling, warmth, redness, calf tenderness. Report promptly; do not massage the leg.', { a: ['DVT', 'D V T'] }),
+    T('Muscle strength 0 to 5', 'Test hip flexion, knee extension, plantar and dorsiflexion against resistance.', { a: ['muscle strength'] }),
+    T('Varicose veins', 'Dilated, tortuous superficial veins.', { a: ['varicosities'] })],
+  normal: 'Legs symmetric in size; skin warm, hair present, no edema, lesions, or varicosities; pulses 2+ and equal; capillary refill under 2 to 3 seconds; strength 5/5; calves soft and non-tender.',
+  abn: ['Pitting edema (1+ to 4+)', 'Unilateral swelling, warmth, erythema, tenderness (possible DVT)', 'Shiny hairless skin, cool, pale, weak pulses (arterial insufficiency)', 'Brown discoloration, edema, ulcers near ankle (venous insufficiency)', 'Weakness, pain, paresthesia'],
+  flag: 'Edema grading mm and seconds differ between textbooks; the 1+ to 4+ concept is standard. Homans sign is no longer considered reliable.' },
+{ id: 'femoral', name: 'Femoral Pulse', al: ['femoral', 'femoral pulse', 'groin pulse'], views: ['front'], pulse: true, sh: { front: [C(124, 334, 12), C(176, 334, 12)] },
+  terms: [T('Femoral pulse', 'Felt in the inguinal region, midway between the anterior superior iliac spine and the pubic symphysis (below the inguinal ligament). Press deeply; use gloves.', { p: 'fem or al pulse' }),
+    T('Bruit', 'Whooshing sound over a narrowed artery.', { p: 'broo ee' })],
+  normal: 'Palpable, equal, strong (2+), without bruit.',
+  abn: ['Diminished or absent (peripheral artery disease, aortic problems)', 'Bruit', 'Hematoma or pulsatile mass after cardiac catheterization'],
+  flag: 'Check the access site per policy after femoral catheterization.' },
+{ id: 'knees', name: 'Genicular Region (Patellar)', al: ['knees', 'knee', 'patella', 'genicular', 'patellar region', 'genicular region'], views: ['front'], sh: { front: [C(129, 428, 16), C(171, 428, 16)] },
+  terms: [T('Range of motion', 'Flexion about 130 to 140 degrees and full extension to 0.', { a: ['ROM'] }),
+    T('Crepitus', 'Crackling or grating felt or heard with joint movement.', { p: 'crep ih tus' }),
+    T('Effusion', 'Fluid in the joint; swelling, bulge sign, or patellar ballottement.', { a: ['joint effusion', 'swelling'] }),
+    T('Patellar reflex', 'Deep tendon reflex: tap the patellar tendon; graded 0 to 4+ (2+ is normal).', { a: ['knee jerk reflex', 'deep tendon reflex'] })],
+  normal: 'Knees symmetric, no swelling, warmth, or deformity; full ROM without pain or crepitus; stable joint; patellar reflex 2+.',
+  abn: ['Swelling, warmth, redness (arthritis, infection)', 'Crepitus, locking, instability', 'Limited ROM', 'Genu varum (bow legs) or genu valgum (knock knees)'],
+  flag: '' },
+{ id: 'popliteal', name: 'Popliteal Pulse', al: ['popliteal', 'popliteal pulse', 'back of knee'], views: ['back'], pulse: true, sh: { back: [C(129, 428, 13), C(171, 428, 13)] },
+  terms: [T('Popliteal pulse', 'In the popliteal fossa with the knee slightly flexed; use both hands and deep pressure. This is the hardest peripheral pulse to find.', { p: 'pop lih tee al pulse' })],
+  normal: 'Palpable (often faint), equal bilaterally, 2+.',
+  abn: ['Absent or weak (arterial insufficiency)', 'Bounding or pulsatile mass (popliteal aneurysm)', 'Unequal pulses'],
+  flag: 'A strong, easy-to-feel popliteal pulse can mean an aneurysm.' },
+{ id: 'feet', name: 'Pedal / Plantar Structures', al: ['feet', 'foot', 'toes', 'ankles', 'plantar', 'plantar surface', 'pedal structures', 'tarsal'], views: ['front', 'back'], sh: { front: [E(129, 596, 19, 26), E(171, 596, 19, 26)], back: [E(129, 596, 19, 26), E(171, 596, 19, 26)] },
+  terms: [T('Capillary refill', 'Toenail bed color returns under 2 to 3 seconds.', { a: ['cap refill'] }),
+    T('Monofilament test', 'Light touch sensation check with a 10 gram monofilament; essential diabetic foot assessment.', { a: ['monofilament', 'diabetic foot exam'], p: 'mono fill ah ment' }),
+    T('Babinski reflex', 'Stroke the lateral sole heel-to-toe. Normal adult: toes curl down (plantar flexion). Abnormal: great toe dorsiflexion with fanning (upper motor neuron problem); normal in infants.', { a: ['babinski', 'babinski sign', 'plantar reflex'], p: 'bah bin ski' }),
+    T('Dorsalis pedis and posterior tibial', 'The two pedal pulses; check both feet and compare.', { a: ['pedal pulses'] }),
+    T('Integumentary integrity', 'Inspect interdigital spaces and the calcaneal region for ulcers, fissures, calluses, corns, bunions, fungal infection (tinea pedis).', { a: ['skin integrity'] })],
+  normal: 'Feet warm, pink, skin intact, nails trimmed without fungus; pulses present; capillary refill under 2 to 3 seconds; sensation intact; no deformity; toes flex down on plantar stimulation (adults).',
+  abn: ['Ulcers, wounds, gangrene, cracked skin', 'Cool, pale, dusky, or cyanotic feet; absent pulses', 'Loss of protective sensation (neuropathy)', 'Edema, deformity (bunion, hammer toe)', 'Positive Babinski in an adult'],
+  flag: 'Always count pedal pulses when circulation is a concern (post-op vascular surgery, diabetic).' },
+{ id: 'pedal', name: 'Pedal Pulses', al: ['pedal', 'pedal pulses', 'dorsalis pedis', 'posterior tibial'], views: ['front'], pulse: true, sh: { front: [C(129, 584, 11), C(171, 584, 11)] },
+  terms: [T('Dorsalis pedis', 'On the dorsum of the foot, lateral to the extensor tendon of the great toe.', { a: ['dorsalis pedis pulse', 'DP pulse'], p: 'dor sal is peed iss' }),
+    T('Posterior tibial', 'Behind and just below the medial malleolus (medial ankle prominence).', { a: ['posterior tibial pulse', 'PT pulse'] }),
+    T('Pedal pulses', 'Palpate lightly (too much pressure obliterates the pulse); compare both feet.', { a: ['pedal pulse'] }),
+    T('Doppler', 'A handheld Doppler may be used if a pulse is not palpable; mark the site.')],
+  normal: 'Palpable, equal bilaterally, 2+, with warm feet and capillary refill under 2 to 3 seconds.',
+  abn: ['Weak, absent, or asymmetric pulses', 'Cool, pale, hairless, shiny skin', 'Pain at rest, delayed refill (arterial insufficiency)', 'Sudden loss with the 6 Ps (pain, pallor, pulselessness, paresthesia, paralysis, poikilothermia) - emergency'],
+  flag: 'The dorsalis pedis is congenitally absent in a small percentage of people; check the posterior tibial.' },
+{ id: 'skin', name: 'Integumentary System', al: ['skin', 'integumentary', 'general skin', 'Skin (Overall)', 'integumentary system', 'overall skin', 'skin overall'], views: ['front', 'back'], sh: { front: [RR(54, 4, 192, 618, 40)], back: [RR(54, 4, 192, 618, 40)] }, skinbg: true,
+  terms: [T('Integumentary turgor', 'Pinch skin on the forearm, forehead, or sternum; it should snap back promptly. Tenting suggests dehydration but is unreliable in older adults.', { a: ['skin turgor', 'turgor', 'tenting'], p: 'tur ger' }),
+    T('Pallor', 'Paleness; anemia or poor perfusion. In darker skin check conjunctiva, lips, nail beds.', { p: 'pal er' }),
+    T('Cyanosis', 'Bluish color from hypoxia; central (lips, tongue, mucosa) is more serious than peripheral.', { p: 'sigh uh no sis' }),
+    T('Jaundice', 'Yellow skin and sclera from elevated bilirubin; look at sclera and under the tongue first.', { p: 'jawn dis' }),
+    T('Ecchymosis', 'Bruise: larger area of bleeding under the skin (petechiae are tiny pinpoint spots; purpura larger).', { p: 'eck ih moh sis' }),
+    T('Braden scale', 'Pressure injury risk: sensory perception, moisture, activity, mobility, nutrition, friction and shear. Score 6 to 23; 18 or lower is at risk (15 to 18 mild, 13 to 14 moderate, 10 to 12 high, 9 or lower very high).', { a: ['braden', 'braden scale'], p: 'bray den scale' }),
+    T('Temperature, moisture, texture', 'Warm, dry, smooth and intact is normal; note diaphoresis, clamminess, rash, lesions.', { a: ['warm dry and intact', 'skin warm dry intact'] }),
+    T('Pressure injury stages', 'Stage 1 non-blanchable erythema, stage 2 partial thickness, stage 3 full thickness skin loss, stage 4 exposing muscle or bone; unstageable and deep tissue pressure injury.', { a: ['pressure injury', 'pressure ulcer'] })],
+  normal: 'Skin warm, dry, intact, good turgor, color appropriate for the patient, no lesions, rashes, bruising, or edema; Braden score 19 or higher (no risk).',
+  abn: ['Pallor, cyanosis, jaundice, erythema', 'Ecchymosis, petechiae, purpura', 'Poor turgor or tenting, dryness, diaphoresis', 'Rash, lesions, wounds, pressure injury (check bony prominences)', 'Suspicious moles: ABCDE (asymmetry, border, color, diameter, evolving)'],
+  flag: 'Braden cut-offs given are the standard published ones; some facilities use different thresholds. In darker skin tones color changes appear differently; use mucous membranes, palms, soles, and nail beds. Tap the dotted body outline for this panel.' },
+{ id: 'neuro', name: 'Neurologic Status / Mentation', al: ['neuro', 'neurological', 'mental status', 'neurologic', 'Neuro / Mental Status', 'mentation', 'neurologic status', 'neuro mental status'], views: [], panel: true,
+  terms: [T('Level of consciousness', 'Alert, lethargic, obtunded, stuporous, comatose; the first and most sensitive sign of neurological change.', { a: ['LOC'] }),
+    T('Alert and oriented x4', 'Oriented to person, place, time, and situation (many programs use x3: person, place, time).', { a: ['alert and oriented times four', 'A and O x4', 'A and O times 4', 'alert and oriented x3'], p: 'alert and oriented times four' }),
+    T('Glasgow Coma Scale', 'Eye opening (1 to 4), verbal response (1 to 5), motor response (1 to 6); total 3 to 15.', { a: ['GCS', 'glasgow coma score'] }),
+    T('Cranial nerves', 'Twelve pairs, I to XII; test by smell, vision, eye movement, facial movement, hearing, swallowing, tongue and shoulder movement.', { a: ['cranial nerves one to twelve'] }),
+    T('Babinski', 'Normal adult: plantar flexion of toes. Abnormal: great toe dorsiflexion with fanning of the toes.', { a: ['babinski sign', 'babinski reflex'], p: 'bah bin ski' }),
+    T('Deep tendon reflexes', 'Graded 0 to 4+; 2+ is normal. Test biceps, triceps, brachioradialis, patellar, Achilles.', { a: ['DTR', 'reflexes'] }),
+    T('Pupil response', 'PERRLA; pupil changes can signal increased intracranial pressure.', { a: ['PERRLA', 'pearla'], p: 'per la' }),
+    T('Speech', 'Clear, fluent, appropriate. Slurred speech (dysarthria) or word-finding trouble (aphasia) are red flags.', { a: ['dysarthria', 'aphasia'] }),
+    T('Sensation and coordination', 'Light touch, pain, vibration; finger to nose, rapid alternating movements, Romberg, gait.', { a: ['Romberg', 'finger to nose', 'coordination'] })],
+  normal: 'Alert and oriented, follows commands, speech clear, memory and judgment appropriate; PERRLA; cranial nerves intact; strength 5/5 and symmetric; sensation intact; reflexes 2+; coordinated gait; GCS 15.',
+  abn: ['Decreased level of consciousness, confusion, new disorientation (delirium)', 'Facial droop, arm drift, slurred speech (stroke, use FAST)', 'Unequal or fixed pupils, abnormal posturing', 'Seizure activity, tremor', 'Weakness, numbness, ataxia, positive Babinski in adults'],
+  flag: 'Orientation x3 versus x4 and exact GCS wording differ slightly between programs. Report acute neuro changes immediately.' },
+{ id: 'vitals', name: 'Vital Signs', al: ['vitals', 'vital signs', 'vital'], views: [], panel: true,
+  terms: [T('Temperature', 'Adult oral normal about 97.7 to 99.5 degrees F (36.5 to 37.5 C); fever is generally 100.4 F (38 C) or higher. Route affects values.', { a: ['temp', 'body temperature'] }),
+    T('Pulse', 'Adult 60 to 100 beats per minute; note rate, rhythm, strength.', { a: ['heart rate', 'pulse rate'] }),
+    T('Respirations', 'Adult 12 to 20 breaths per minute; count for a full 30 to 60 seconds without telling the patient.', { a: ['respiratory rate', 'respiration'] }),
+    T('Blood pressure', 'Adult normal under 120/80 mmHg; elevated 120 to 129 systolic with under 80 diastolic; hypertension begins at 130/80 by ACC/AHA 2017 definitions. Right cuff size and arm at heart level.', { a: ['BP', 'B P'] }),
+    T('Oxygen saturation', 'SpO2 usually 95 to 100 percent on room air; under 90 percent is a concern. COPD targets may be 88 to 92 percent per order.', { a: ['SpO2', 'pulse oximetry', 'O2 sat', 'sats'], p: 'S P O two' }),
+    T('Pain scale', 'Fifth vital sign in many facilities; 0 to 10 numeric scale, or Wong-Baker faces for children.', { a: ['pain', 'pain assessment', 'pain score'] }),
+    T('Orthostatic vital signs', 'Lying, sitting, then standing BP and pulse; a drop of 20 mmHg systolic or 10 diastolic with symptoms is positive.', { a: ['orthostatics', 'orthostatic hypotension'] })],
+  normal: 'T 97.7 to 99.5 F; P 60 to 100; R 12 to 20; BP under 120/80; SpO2 95 to 100 percent; pain 0 out of 10.',
+  abn: ['Fever, hypothermia', 'Tachycardia or bradycardia', 'Tachypnea, bradypnea, apnea', 'Hypertension, hypotension', 'SpO2 under 90 percent, new pain'],
+  flag: 'Reference ranges differ with age, method, and facility policy; BP categories follow ACC/AHA 2017 (other guidelines use 140/90). Report abnormal values per scope of practice.' }
+];
+
+var BYID = {};
+var i;
+for (i = 0; i < REGIONS.length; i++) { BYID[REGIONS[i].id] = REGIONS[i]; }
+
+function norm(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[\u2018\u2019']/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function lev(a, b) {
+  var m = a.length, n = b.length, p = [], pp = [], c, x, y, cost;
+  if (m === 0) { return n; }
+  if (n === 0) { return m; }
+  for (y = 0; y <= n; y++) { p.push(y); }
+  for (x = 1; x <= m; x++) {
+    c = [x];
+    for (y = 1; y <= n; y++) {
+      cost = a.charAt(x - 1) === b.charAt(y - 1) ? 0 : 1;
+      c.push(Math.min(p[y] + 1, c[y - 1] + 1, p[y - 1] + cost));
+      if (x > 1) { if (y > 1) { if (a.charAt(x - 1) === b.charAt(y - 2)) { if (a.charAt(x - 2) === b.charAt(y - 1)) { c[y] = Math.min(c[y], pp[y - 2] + 1); } } } }
+    }
+    pp = p;
+    p = c;
+  }
+  return p[n];
+}
+function sim(a, b) {
+  var mx = Math.max(a.length, b.length);
+  if (mx === 0) { return 1; }
+  return 1 - lev(a, b) / mx;
+}
+function variantsOf(strs) {
+  var out = [], k, s, par, base, parts, j, q, z, v;
+  for (k = 0; k < strs.length; k++) {
+    s = String(strs[k]);
+    par = s.match(/\(([^)]*)\)/);
+    base = s.replace(/\([^)]*\)/g, ' ');
+    parts = [s, base];
+    if (par) { parts.push(par[1]); }
+    for (j = 0; j < parts.length; j++) {
+      q = parts[j].split('/');
+      for (z = 0; z < q.length; z++) {
+        v = norm(q[z]);
+        if (v.length > 0) { if (out.indexOf(v) < 0) { out.push(v); } }
+      }
+    }
+  }
+  return out;
+}
+function scoreAgainst(heard, variants) {
+  var hh = norm(heard), best = 0, k, v, w, n, st, win, sc;
+  if (!hh) { return 0; }
+  w = hh.split(' ');
+  for (k = 0; k < variants.length; k++) {
+    v = variants[k];
+    sc = sim(hh, v);
+    if (sc < 1) { sc = Math.max(sc, sim(hh.replace(/ /g, ''), v.replace(/ /g, ''))); }
+    n = v.split(' ').length;
+    if (w.length > n) {
+      for (st = 0; st + n <= w.length; st++) {
+        win = w.slice(st, st + n).join(' ');
+        sc = Math.max(sc, sim(win, v));
+      }
+    }
+    if (v.length <= 3) { if (sc < 1) { sc = Math.min(sc, 0.7); } }
+    if (sc > best) { best = sc; }
+  }
+  return best;
+}
+var T_OK = 0.85, T_CLOSE = 0.6;
+function grade(heardList, targets) {
+  if (typeof heardList === 'string') { heardList = [heardList]; }
+  if (typeof targets === 'string') { targets = [targets]; }
+  var vars = variantsOf(targets), best = -1, bestH = '', k, sc;
+  for (k = 0; k < heardList.length; k++) {
+    sc = scoreAgainst(heardList[k], vars);
+    if (sc > best) { best = sc; bestH = heardList[k]; }
+  }
+  if (best < 0) { best = 0; }
+  return { score: best, heard: bestH, verdict: best >= T_OK ? 'correct' : (best >= T_CLOSE ? 'close' : 'wrong') };
+}
+function targetsFor(term) { return [term.t].concat(term.a || []); }
+function nameTargets(r) { return [r.name].concat(r.al || []); }
+
+var NS = 'http://www.w3.org/2000/svg';
+function $(id) { return document.getElementById(id); }
+function h(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) { e.className = cls; }
+  if (text !== undefined) { e.textContent = text; }
+  return e;
+}
+function clear(e) { while (e.firstChild) { e.removeChild(e.firstChild); } }
+function btn(label, cls, fn) {
+  var b = h('button', cls || '', label);
+  b.type = 'button';
+  b.addEventListener('click', fn);
+  return b;
+}
+
+var state = { mode: 'explore', view: 'front', sel: null, termIdx: 0, quiz: null };
+var scoreKey = 'lvn_trainer_score_v1';
+var score = { correct: 0, total: 0, streak: 0, best: 0 };
+(function loadScore() {
+  var raw = Store.get(scoreKey), o;
+  if (raw) { try { o = JSON.parse(raw); if (o) { score.correct = +o.correct || 0; score.total = +o.total || 0; score.streak = +o.streak || 0; score.best = +o.best || 0; } } catch (e) { /* ignore */ } }
+})();
+function saveScore() { Store.set(scoreKey, JSON.stringify(score)); }
+
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function speak(text) {
+  try {
+    if (!window.speechSynthesis) { return false; }
+    window.speechSynthesis.cancel();
+    var u = new window.SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = 0.85;
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch (e) { return false; }
+}
+function listen(onResult, onStatus) {
+  if (!SR) { onStatus('unsupported'); return; }
+  var rec;
+  try {
+    rec = new SR();
+    rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 5; rec.continuous = false;
+    rec.onstart = function () { onStatus('listening'); };
+    rec.onresult = function (ev) {
+      var list = [], res = ev.results[ev.results.length - 1], k;
+      for (k = 0; k < res.length; k++) { list.push(res[k].transcript); }
+      onResult(list);
+    };
+    rec.onerror = function (ev) { onStatus('error:' + (ev ? (ev.error || 'unknown') : 'unknown')); };
+    rec.onnomatch = function () { onStatus('nomatch'); };
+    rec.onend = function () { onStatus('end'); };
+    rec.start();
+  } catch (e) { onStatus('error:' + e.message); }
+}
+function statusText(s) {
+  if (s === 'listening') { return 'Listening... say it now.'; }
+  if (s === 'nomatch') { return 'Did not catch that. Try again.'; }
+  if (s === 'error:not-allowed' || s === 'error:service-not-allowed') { return 'Microphone permission was blocked. Allow the mic in your browser settings, or type your answer.'; }
+  if (s === 'error:no-speech') { return 'No speech heard. Tap Say it and try again, or type it.'; }
+  if (s.indexOf('error:') === 0) { return 'Speech problem (' + s.slice(6) + '). You can type your answer instead.'; }
+  return '';
+}
+function showVerdict(el, g, target) {
+  el.className = 'res ' + g.verdict;
+  var msg = g.verdict === 'correct' ? 'Correct! ' : (g.verdict === 'close' ? 'Close! ' : 'Try again. ');
+  el.textContent = msg + 'Heard: "' + g.heard + '" (match ' + Math.round(g.score * 100) + '%)' + (g.verdict === 'correct' ? '' : '  Target: ' + target);
+}
+
+function sayWidget(getTargets, getLabel, speakText, onGraded, hideTarget) {
+  var box = h('div', 'say');
+  var row = h('div', 'row');
+  var res = h('div', 'res');
+  res.setAttribute('role', 'status');
+  var typed = h('input');
+  typed.type = 'text'; typed.placeholder = 'Type the term here'; typed.setAttribute('aria-label', 'Type the term');
+  typed.setAttribute('autocapitalize', 'none'); typed.setAttribute('autocomplete', 'off');
+  var typedRow = h('div', 'row');
+  function doGrade(list) {
+    var g = grade(list, getTargets());
+    showVerdict(res, g, hideTarget ? '(keep trying)' : getLabel());
+    if (onGraded) { onGraded(g); }
+  }
+  var say = btn('Say it', 'primary', function () {
+    res.className = 'res'; res.textContent = '';
+    listen(function (list) { doGrade(list); }, function (s) {
+      var t = statusText(s);
+      if (s === 'unsupported') { t = 'Speech recognition is not supported in this browser. Use Chrome or Safari, or type your answer below.'; res.className = 'res wrong'; }
+      if (t) { if (res.className.indexOf('correct') < 0) { if (res.className.indexOf('close') < 0) { res.textContent = t; } } }
+    });
+  });
+  say.setAttribute('data-act', 'say');
+  if (speakText) {
+    var hear = btn('Hear it', '', function () { if (!speak(speakText())) { res.className = 'res wrong'; res.textContent = 'Speech playback is not available in this browser.'; } });
+    hear.setAttribute('data-act', 'hear');
+    row.appendChild(hear);
+  }
+  var check = btn('Check', '', function () { if (typed.value.trim()) { doGrade([typed.value]); } });
+  check.setAttribute('data-act', 'check');
+  typed.addEventListener('keydown', function (e) { if (e.key === 'Enter') { check.click(); } });
+  row.appendChild(say);
+  typedRow.appendChild(typed); typedRow.appendChild(check);
+  typedRow.style.marginTop = '8px';
+  box.appendChild(row);
+  if (!SR) {
+    box.appendChild(h('div', 'flag', 'Speech recognition is not supported in this browser, so Say it is unavailable. Type your answer below instead. Use Chrome or Safari for voice practice.'));
+  } else {
+    box.appendChild(h('div', 'note', 'Works best in Chrome or Safari. Allow the microphone when asked.'));
+  }
+  box.appendChild(typedRow);
+  box.appendChild(res);
+  box.typed = typed; box.res = res;
+  return box;
+}
+
+function makeShape(sp) {
+  var e;
+  if (sp[0] === 'e') { e = document.createElementNS(NS, 'ellipse'); e.setAttribute('cx', sp[1]); e.setAttribute('cy', sp[2]); e.setAttribute('rx', sp[3]); e.setAttribute('ry', sp[4]); }
+  else if (sp[0] === 'c') { e = document.createElementNS(NS, 'circle'); e.setAttribute('cx', sp[1]); e.setAttribute('cy', sp[2]); e.setAttribute('r', sp[3]); }
+  else { e = document.createElementNS(NS, 'rect'); e.setAttribute('x', sp[1]); e.setAttribute('y', sp[2]); e.setAttribute('width', sp[3]); e.setAttribute('height', sp[4]); e.setAttribute('rx', sp[5]); }
+  return e;
+}
+function regClass(r, extra) {
+  return 'reg' + (r.pulse ? ' pulse' : '') + (r.skinbg ? ' skin' : '') + (extra ? ' ' + extra : '');
+}
+function drawMap() {
+  var wrap = $('mapwrap'), svg, r, k, s, v = state.view, bg = [], mid = [], pul = [], order;
+  clear(wrap);
+  svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 300 640');
+  svg.setAttribute('role', 'group');
+  svg.setAttribute('aria-label', (v === 'front' ? 'Anterior' : 'Posterior') + ' anatomical body map');
+  for (k = 0; k < REGIONS.length; k++) {
+    r = REGIONS[k];
+    if (r.sh) { if (r.sh[v]) { if (r.skinbg) { bg.push(r); } else if (r.pulse) { pul.push(r); } else { mid.push(r); } } }
+  }
+  order = bg.concat(mid, pul);
+  order.forEach(function (rg) {
+    var g = document.createElementNS(NS, 'g');
+    g.setAttribute('data-region', rg.id);
+    g.setAttribute('class', regClass(rg));
+    g.setAttribute('tabindex', '0');
+    g.setAttribute('role', 'button');
+    g.setAttribute('aria-label', state.mode === 'explore' ? rg.name : 'anatomical region');
+    rg.sh[v].forEach(function (sp) { g.appendChild(makeShape(sp)); });
+    g.addEventListener('click', function () { onRegionTap(rg.id); });
+    g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRegionTap(rg.id); } });
+    svg.appendChild(g);
+  });
+  var t1 = document.createElementNS(NS, 'text');
+  t1.setAttribute('class', 'lbl'); t1.setAttribute('x', 150); t1.setAttribute('y', 636);
+  t1.textContent = (v === 'front' ? 'ANTERIOR' : 'POSTERIOR') + ' (patient right = your left)';
+  svg.appendChild(t1);
+  wrap.appendChild(svg);
+  applyMarks();
+}
+function applyMarks() {
+  var els = document.querySelectorAll('[data-region]'), k, id, r, on;
+  for (k = 0; k < els.length; k++) {
+    id = els[k].getAttribute('data-region');
+    r = BYID[id];
+    if (els[k].tagName.toLowerCase() === 'g') {
+      var ex = '';
+      if (state.mode === 'explore') { if (state.sel === id) { ex = 'sel'; } }
+      if (state.mode === 'name') { if (state.quiz) { if (state.quiz.id === id) { ex = 'hl'; } } }
+      if (state.mode === 'tap') { if (state.quiz) { if (state.quiz.answered) { if (state.quiz.id === id) { ex = 'hl'; } } } }
+      els[k].setAttribute('class', regClass(r, ex));
+    } else {
+      on = state.mode === 'explore' ? state.sel === id : false;
+      els[k].classList.toggle('on', on);
+    }
+  }
+}
+function drawList() {
+  var wrap = $('listwrap'), k, r, chips;
+  clear(wrap);
+  if (state.mode !== 'explore') { return; }
+  wrap.appendChild(h('h3', '', 'Anatomical regions (tap any)'));
+  chips = h('div', 'chips');
+  REGIONS.forEach(function (rg) {
+    var show = rg.panel ? true : (rg.views.indexOf(state.view) >= 0);
+    if (!show) { return; }
+    var b = btn(rg.name, '', function () { onRegionTap(rg.id); });
+    b.setAttribute('data-region', rg.id);
+    chips.appendChild(b);
+  });
+  wrap.appendChild(chips);
+}
+function drawViewBar() {
+  var bar = $('viewbar');
+  clear(bar);
+  ['front', 'back'].forEach(function (v) {
+    var b = btn(v === 'front' ? 'Anterior view' : 'Posterior view', state.view === v ? 'on' : '', function () { state.view = v; render(); });
+    b.setAttribute('data-view', v);
+    bar.appendChild(b);
+  });
+}
+function drawModeBar() {
+  var bar = $('modebar');
+  clear(bar);
+  [['explore', 'Explore'], ['tap', 'Quiz: Tap it'], ['name', 'Quiz: Name it']].forEach(function (m) {
+    var b = btn(m[1], state.mode === m[0] ? 'on' : '', function () { setMode(m[0]); });
+    b.setAttribute('data-mode', m[0]);
+    bar.appendChild(b);
+  });
+}
+
+function onRegionTap(id) {
+  if (state.mode === 'explore') { selectRegion(id); }
+  else if (state.mode === 'tap') { answerTap(id); }
+}
+function selectRegion(id) {
+  var r = BYID[id];
+  state.sel = id; state.termIdx = 0;
+  if (r.views.length > 0) { if (r.views.indexOf(state.view) < 0) { state.view = r.views[0]; drawViewBar(); drawMap(); drawList(); } }
+  applyMarks();
+  drawRegionPanel();
+}
+function drawRegionPanel() {
+  var p = $('panel'), r = BYID[state.sel];
+  clear(p);
+  if (!r) {
+    p.appendChild(h('h2', '', 'Select an anatomical region'));
+    p.appendChild(h('p', '', 'Tap any anatomical region on the body map or in the region list to see assessment terms, normal findings, and common abnormal findings. Then practice saying the term.'));
+    p.appendChild(h('p', 'note', 'Neurologic Status / Mentation and Vital Signs are general panels in the list under the map.'));
+    return;
+  }
+  p.appendChild(h('h2', '', r.name));
+  p.appendChild(h('h3', '', 'Assessment terms (tap one to practice)'));
+  r.terms.forEach(function (t, idx) {
+    var d = h('div', 'term' + (idx === state.termIdx ? ' sel' : ''));
+    d.setAttribute('data-term', idx);
+    d.setAttribute('role', 'button');
+    d.setAttribute('tabindex', '0');
+    d.appendChild(h('b', '', t.t));
+    d.appendChild(h('span', '', t.d));
+    function pick() { state.termIdx = idx; drawRegionPanel(); }
+    d.addEventListener('click', pick);
+    d.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    p.appendChild(d);
+  });
+  var cur = r.terms[state.termIdx];
+  p.appendChild(h('h3', '', 'Speaking practice: "' + cur.t + '"'));
+  p.appendChild(sayWidget(function () { return targetsFor(cur); }, function () { return cur.t; }, function () { return cur.p || cur.t; }));
+  p.appendChild(h('h3', '', 'Normal finding'));
+  p.appendChild(h('div', 'norm', r.normal));
+  p.appendChild(h('h3', '', 'Common abnormal findings'));
+  var ab = h('div', 'abn'), ul = h('ul');
+  r.abn.forEach(function (a) { ul.appendChild(h('li', '', a)); });
+  ab.appendChild(ul);
+  p.appendChild(ab);
+  if (r.flag) { p.appendChild(h('div', 'flag', 'Check / uncertain: ' + r.flag)); }
+}
+
+function setMode(m) {
+  state.mode = m; state.quiz = null; state.sel = null;
+  if (m !== 'explore') { nextQuestion(); }
+  render();
+}
+var lastQ = null;
+function pool() {
+  var a = [];
+  REGIONS.forEach(function (r) {
+    if (r.views.length === 0) { return; }
+    if (state.mode === 'name') { if (r.skinbg) { return; } }
+    a.push(r);
+  });
+  return a;
+}
+function nextQuestion() {
+  var pl = pool(), r, tries = 0;
+  do { r = pl[Math.floor(Math.random() * pl.length)]; tries++; } while (r.id === lastQ ? tries < 10 : false);
+  lastQ = r.id;
+  state.quiz = { id: r.id, answered: false };
+  if (r.views.indexOf(state.view) < 0) { state.view = r.views[0]; }
+  else if (state.mode === 'tap') { state.view = r.views[0]; }
+}
+function record(ok) {
+  score.total += 1;
+  if (ok) { score.correct += 1; score.streak += 1; if (score.streak > score.best) { score.best = score.streak; } }
+  else { score.streak = 0; }
+  saveScore();
+}
+function scoreBar() {
+  var d = h('div', 'score');
+  var pct = score.total ? Math.round(100 * score.correct / score.total) : 0;
+  d.appendChild(h('span', '', 'Score: ' + score.correct + '/' + score.total + ' (' + pct + '%)'));
+  var s = h('span', '', 'Streak: ' + score.streak); s.id = 'streak'; d.appendChild(s);
+  d.appendChild(h('span', '', 'Best: ' + score.best));
+  d.appendChild(btn('Reset score', '', function () { score = { correct: 0, total: 0, streak: 0, best: 0 }; saveScore(); drawQuizPanel(); }));
+  return d;
+}
+function answerTap(id) {
+  var q = state.quiz;
+  if (!q) { return; }
+  if (q.answered) { return; }
+  q.answered = true;
+  var ok = id === q.id;
+  record(ok);
+  q.fb = { ok: ok, text: ok ? 'Correct!' : 'Not quite. You tapped ' + BYID[id].name + '.' };
+  applyMarks();
+  drawQuizPanel();
+}
+function drawQuizPanel() {
+  var p = $('panel'), q = state.quiz, r;
+  clear(p);
+  if (!q) { return; }
+  r = BYID[q.id];
+  p.appendChild(scoreBar());
+  if (state.mode === 'tap') {
+    p.appendChild(h('h3', '', 'Tap this anatomical region on the body map'));
+    var big = h('div', 'big', r.name); big.id = 'qprompt'; p.appendChild(big);
+    p.appendChild(h('p', 'note', 'The map switches to the view that contains it.'));
+    var hr = h('div', 'row');
+    hr.appendChild(btn('Hear the name', '', function () { speak(r.name); }));
+    p.appendChild(hr);
+  } else {
+    p.appendChild(h('h3', '', 'Identify the highlighted anatomical region. Say it or type it.'));
+    var pr = h('div', 'big', 'Name the highlighted anatomical region'); pr.id = 'qprompt'; p.appendChild(pr);
+    if (!q.answered) {
+      p.appendChild(sayWidget(function () { return nameTargets(r); }, function () { return r.name; }, null, function (g) {
+        if (q.answered) { return; }
+        if (g.verdict === 'correct') { q.answered = true; record(true); q.fb = { ok: true, text: 'Correct! ' + r.name }; drawQuizPanel(); }
+      }, true));
+      var gu = btn('Give up / Show answer', '', function () { if (!q.answered) { q.answered = true; record(false); q.fb = { ok: false, text: 'Answer: ' + r.name }; drawQuizPanel(); } });
+      gu.id = 'qgiveup'; gu.style.marginTop = '10px';
+      p.appendChild(gu);
+    }
+  }
+  if (q.answered) {
+    var fb = h('div', 'res ' + (q.fb.ok ? 'correct' : 'wrong'), q.fb.text); fb.id = 'qfeedback'; p.appendChild(fb);
+    p.appendChild(h('div', 'norm', 'Region: ' + r.name + '. Normal: ' + r.normal));
+    var nb = btn('Next question', 'primary', function () { nextQuestion(); render(); }); nb.id = 'qnext'; nb.style.marginTop = '10px';
+    p.appendChild(nb);
+  }
+}
+
+function render() {
+  drawModeBar(); drawViewBar(); drawMap(); drawList();
+  if (state.mode === 'explore') { drawRegionPanel(); } else { drawQuizPanel(); }
+}
+
+window.__LVN = { REGIONS: REGIONS, grade: grade, norm: norm, lev: lev, sim: sim, state: state, getScore: function () { return score; }, selectRegion: selectRegion, setMode: setMode, render: render, onRegionTap: onRegionTap, speakSupported: !!SR };
+render();
+})();
+
+(function () {
+  if (/^https?:/.test(location.protocol)) {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    }
+  }
+  var deferred = null, btn = null;
+  var hdr = document.querySelector('header');
+  function mk(tag, txt) { var e = document.createElement(tag); e.textContent = txt; return e; }
+  window.addEventListener('beforeinstallprompt', function (ev) {
+    ev.preventDefault(); deferred = ev;
+    if (!btn) { if (hdr) {
+      btn = mk('button', 'Install app'); btn.type = 'button'; btn.id = 'installBtn';
+      btn.style.marginTop = '8px';
+      btn.addEventListener('click', function () {
+        if (!deferred) return;
+        var p = deferred; deferred = null; btn.hidden = true;
+        p.prompt();
+      });
+      hdr.appendChild(btn);
+    } }
+    if (btn) btn.hidden = false;
+  });
+  window.addEventListener('appinstalled', function () { deferred = null; if (btn) btn.hidden = true; });
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var standalone = window.navigator.standalone === true;
+  if (ios) { if (!standalone) { if (hdr) {
+    var h = mk('p', 'To install on iPhone/iPad: tap Share, then Add to Home Screen.');
+    h.style.fontSize = '.8rem'; hdr.appendChild(h);
+  } } }
+})();
+</script>
+</body>
+</html>

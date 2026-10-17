@@ -1,0 +1,15 @@
+{
+  "name": "LVN Head-to-Toe Trainer",
+  "short_name": "LVN Trainer",
+  "description": "Head-to-toe assessment trainer with medical terminology for LVN students.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0b6e99",
+  "icons": [
+    {"src": "icons/icon-any.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+    {"src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable"}
+  ]
+}
